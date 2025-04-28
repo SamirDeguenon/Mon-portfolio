@@ -1,0 +1,687 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portfolio de Samir DEGUENON</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+  <style>
+    /* Style pour le loader */
+    #loader {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #1e40af;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      transition: opacity 0.5s ease;
+    }
+    #loader.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #ffffff;
+      border-top: 4px solid #93c5fd;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    /* Style pour l'arrière-plan de particules du header */
+    #header-particles {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      background: #1e40af;
+    }
+    /* Assurer que le contenu est au-dessus des particules */
+    nav > *:not(#header-particles) {
+      position: relative;
+      z-index: 1;
+    }
+    /* Style pour le modal */
+    #project-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      overflow-y: auto;
+      transition: background 0.3s ease;
+    }
+    #project-modal.open {
+      background: rgba(0, 0, 0, 0.75);
+    }
+    #project-modal .modal-content {
+      background: white;
+      max-width: 90%;
+      width: 500px;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+      margin: 1rem;
+    }
+    #project-modal .close-modal {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      font-size: 1.25rem;
+      cursor: pointer;
+      color: #1e40af;
+      transition: color 0.2s;
+    }
+    #project-modal .close-modal:hover {
+      color: #2563eb;
+    }
+    /* Style pour les emojis en bulle */
+    .emoji-bubble {
+      display: inline-block;
+      font-size: 1rem;
+      margin-right: 0.5rem;
+      animation: float 3s ease-in-out infinite, pulse 2s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-5px); }
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+    }
+    /* Style pour les cartes accrochées */
+    .card {
+      position: relative;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .card:hover {
+      transform: translateY(-12px);
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    }
+    .card::before {
+      content: '';
+      position: absolute;
+      top: -20px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 8px;
+      height: 8px;
+      background: #4b5563;
+      border-radius: 50%;
+      z-index: 2;
+    }
+    .card::after {
+      content: '';
+      position: absolute;
+      top: -20px;
+      left: 50%;
+      width: 2px;
+      height: 20px;
+      background: #4b5563;
+      transform: translateX(-50%);
+      z-index: 1;
+    }
+    /* Style pour la navigation */
+    .nav-menu {
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    .nav-menu.hidden {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.8);
+      pointer-events: none;
+    }
+    .hamburger span {
+      transition: all 0.3s ease;
+    }
+    .hamburger.open span:nth-child(1) {
+      transform: rotate(45deg) translate(4px, 4px);
+    }
+    .hamburger.open span:nth-child(2) {
+      opacity: 0;
+    }
+    .hamburger.open span:nth-child(3) {
+      transform: rotate(-45deg) translate(5px, -5px);
+    }
+    /* Corriger l'alignement des cartes */
+    #skills .grid, #projects .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      justify-items: center;
+    }
+    #skills .card, #projects .card {
+      width: 100%;
+      max-width: 280px;
+      margin: 0;
+      margin-top: 30px;
+    }
+    /* Ajustements responsifs */
+    @media (max-width: 767px) {
+      .nav-menu {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80%;
+        max-width: 300px;
+        background: rgba(30, 64, 175, 0.95);
+        flex-direction: column;
+        padding: 1.5rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+        z-index: 1000;
+        opacity: 1;
+      }
+      .nav-menu li {
+        margin: 0.75rem 0;
+      }
+      .hamburger {
+        display: block;
+        cursor: pointer;
+      }
+    }
+    @media (min-width: 768px) {
+      .nav-menu {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80%;
+        max-width: 400px;
+        background: rgba(30, 64, 175, 0.95);
+        flex-direction: column;
+        padding: 2rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+        z-index: 1000;
+        opacity: 1;
+      }
+      .nav-menu li {
+        margin: 1rem 0;
+      }
+      .hamburger {
+        display: block;
+        cursor: pointer;
+      }
+    }
+    @media (max-width: 640px) {
+      h1.text-2xl {
+        font-size: 1.25rem;
+      }
+      h2.text-3xl {
+        font-size: 1.5rem;
+      }
+      .container {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+      }
+      #project-modal .modal-content {
+        width: 95%;
+        padding: 0.75rem;
+      }
+      form.space-y-3 {
+        padding: 0.25rem;
+      }
+      .emoji-bubble {
+        font-size: 0.875rem;
+      }
+      #skills .card, #projects .card {
+        max-width: 100%;
+        padding: 0.75rem;
+      }
+      .text-sm {
+        font-size: 0.75rem;
+      }
+      .text-base {
+        font-size: 0.875rem;
+      }
+      .text-lg {
+        font-size: 1rem;
+      }
+      .text-xl {
+        font-size: 1.125rem;
+      }
+      .text-2xl {
+        font-size: 1.25rem;
+      }
+      .card::before, .card::after {
+        top: -15px;
+      }
+      .card::after {
+        height: 15px;
+      }
+      #skills .card, #projects .card {
+        margin-top: 20px;
+      }
+    }
+  </style>
+</head>
+<body class="bg-gray-100 font-sans">
+  <!-- Loader -->
+  <div id="loader">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- Modal pour les projets -->
+  <div id="project-modal">
+    <div class="modal-content">
+      <span class="close-modal">×</span>
+      <h2 id="modal-title" class="text-lg md:text-xl font-bold mb-3"></h2>
+      <p id="modal-description" class="text-gray-700 mb-3 text-xs md:text-sm"></p>
+      <p id="modal-technologies" class="text-gray-700 mb-3 text-xs md:text-sm"><strong>Technologies :</strong> </p>
+      <a id="modal-link" href="#" target="_blank" class="text-blue-600 hover:underline text-xs md:text-sm">Visiter le projet</a>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="text-white p-3 sticky top-0 shadow-md z-10">
+    <div id="header-particles"></div>
+    <div class="container mx-auto flex justify-between items-center">
+      <h1 class="text-2xl font-bold">Samir DEGUENON</h1>
+      <button class="hamburger flex flex-col justify-center items-center w-7 h-7">
+        <span class="w-5 h-0.5 bg-white mb-1"></span>
+        <span class="w-5 h-0.5 bg-white mb-1"></span>
+        <span class="w-5 h-0.5 bg-white"></span>
+      </button>
+      <ul class="nav-menu hidden">
+        <li><a href="#about" class="hover:underline block py-1.5 text-sm md:text-base">À propos</a></li>
+        <li><a href="#skills" class="hover:underline block py-1.5 text-sm md:text-base">Compétences</a></li>
+        <li><a href="#projects" class="hover:underline block py-1.5 text-sm md:text-base">Projets</a></li>
+        <li><a href="#contact" class="hover:underline block py-1.5 text-sm md:text-base">Contact</a></li>
+        <li><a href="admin.html" class="hover:underline block py-1.5 text-sm md:text-base">Admin</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- À propos -->
+  <section id="about" class="py-8 md:py-12 bg-white bg-opacity-90">
+    <div class="container mx-auto px-4">
+      <h2 class="text-3xl font-bold mb-4 text-center">À propos de moi <span class="emoji-bubble">💼</span></h2>
+      <p id="about-text" class="text-sm md:text-base text-gray-700 max-w-xl mx-auto">
+        Je suis Samir DEGUENON, informaticien junior spécialisé dans les systèmes embarqués et l’Internet des Objets. Passionné par l’électronique et la robotique, je combine mes compétences en développement web et en programmation embarquée pour concevoir des solutions innovantes. Avec une base solide en électronique, j’ai réalisé plusieurs projets mêlant matériel et logiciel. Je parle couramment l’anglais, une langue que j’apprécie particulièrement, et maîtrise les outils Microsoft Office (Word et PowerPoint parfaitement, Excel avec aisance). En dehors du travail, j’aime jouer au football et exprimer ma créativité à travers le dessin. <span class="emoji-bubble">🌟</span>
+      </p>
+    </div>
+  </section>
+
+  <!-- Compétences -->
+  <section id="skills" class="py-8 md:py-12 bg-gray-100 bg-opacity-90">
+    <div class="container mx-auto px-4">
+      <h2 class="text-3xl font-bold mb-4 text-center">Mes compétences <span class="emoji-bubble">🛠️</span></h2>
+      <div id="skills-grid" class="grid"></div>
+    </div>
+  </section>
+
+  <!-- Projets -->
+  <section id="projects" class="py-8 md:py-12 bg-white bg-opacity-90">
+    <div class="container mx-auto px-4">
+      <h2 class="text-3xl font-bold mb-4 text-center">Mes projets <span class="emoji-bubble">🚀</span></h2>
+      <div id="projects-grid" class="grid"></div>
+    </div>
+  </section>
+
+  <!-- Contact -->
+  <section id="contact" class="py-8 md:py-12 bg-gray-100 bg-opacity-90">
+    <div class="container mx-auto px-4">
+      <h2 class="text-3xl font-bold mb-4 text-center">Me contacter <span class="emoji-bubble">✉️</span></h2>
+      <div class="max-w-md mx-auto">
+        <div class="bg-white p-3 md:p-4 rounded-lg shadow-md card">
+          <form action="https://formspree.io/f/xanonaak" method="POST" class="space-y-3">
+            <div>
+              <label for="name" class="block text-gray-700 text-xs md:text-sm">Nom</label>
+              <input type="text" id="name" name="name" required class="w-full p-1.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-600 text-xs md:text-sm">
+            </div>
+            <div>
+              <label for="email" class="block text-gray-700 text-xs md:text-sm">Email</label>
+              <input type="email" id="email" name="email" required class="w-full p-1.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-600 text-xs md:text-sm">
+            </div>
+            <div>
+              <label for="message" class="block text-gray-700 text-xs md:text-sm">Message</label>
+              <textarea id="message" name="message" required rows="3" class="w-full p-1.5 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-600 text-xs md:text-sm"></textarea>
+            </div>
+            <button type="submit" class="w-full bg-blue-600 text-white p-1.5 rounded-md hover:bg-blue-700 transition text-xs md:text-sm">Envoyer</button>
+          </form>
+          <p class="text-gray-700 mt-3 text-xs md:text-sm">Ou connectez-vous avec moi sur : <a href="#" class="text-blue-600 hover:underline">[Votre profil LinkedIn]</a></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pied de page -->
+  <footer class="bg-blue-600 text-white p-3">
+    <div class="container mx-auto text-center">
+      <p class="text-xs md:text-sm">© 2025 Samir DEGUENON. Tous droits réservés.</p>
+    </div>
+  </footer>
+
+  <script>
+    // Gestion du loader
+    window.addEventListener('load', () => {
+      const loader = document.getElementById('loader');
+      setTimeout(() => {
+        loader.classList.add('hidden');
+      }, 1000);
+    });
+
+    // Initialisation des particules pour le header
+    particlesJS('header-particles', {
+      particles: {
+        number: { value: window.innerWidth < 640 ? 15 : 40, density: { enable: true, value_area: 800 } },
+        color: { value: '#ffffff' },
+        shape: { type: 'circle' },
+        opacity: { value: 0.4, random: false },
+        size: { value: 3, random: true },
+        line_linked: { enable: true, distance: 150, color: '#ffffff', opacity: 0.3, width: 1 },
+        move: { enable: true, speed: 1.5, direction: 'none', random: false, straight: false, out_mode: 'out', bounce: false }
+      },
+      interactivity: {
+        detect_on: 'canvas',
+        events: { onhover: { enable: window.innerWidth >= 640, mode: 'repulse' }, onclick: { enable: true, mode: 'push' }, resize: true },
+        modes: { repulse: { distance: 100, duration: 0.4 }, push: { particles_nb: 4 } }
+      },
+      retina_detect: true
+    });
+
+    // Gestion du menu déroulant
+    const hamburger = document.querySelector('.hamburger');
+    const navMenu = document.querySelector('.nav-menu');
+    hamburger.addEventListener('click', () => {
+      hamburger.classList.toggle('open');
+      navMenu.classList.toggle('hidden');
+      if (!navMenu.classList.contains('hidden')) {
+        gsap.fromTo(navMenu, 
+          { opacity: 0, scale: 0.8 },
+          { opacity: 1, scale: 1, duration: 0.4, ease: 'power2.out' }
+        );
+        gsap.fromTo(navMenu.querySelectorAll('li'), 
+          { opacity: 0, y: -10 },
+          { opacity: 1, y: 0, stagger: 0.1, duration: 0.4, ease: 'power2.out' }
+        );
+      }
+    });
+
+    // Smooth scrolling pour les liens de navigation
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function(e) {
+        e.preventDefault();
+        document.querySelector(this.getAttribute('href')).scrollIntoView({
+          behavior: 'smooth'
+        });
+        hamburger.classList.remove('open');
+        gsap.to(navMenu, {
+          opacity: 0,
+          scale: 0.8,
+          duration: 0.3,
+          ease: 'power2.in',
+          onComplete: () => {
+            navMenu.classList.add('hidden');
+          }
+        });
+      });
+    });
+
+    // Initialisation des données par défaut
+    const defaultData = {
+      about: "Je suis Samir DEGUENON, informaticien junior spécialisé dans les systèmes embarqués et l’Internet des Objets. Passionné par l’électronique et la robotique, je combine mes compétences en développement web et en programmation embarquée pour concevoir des solutions innovantes. Avec une base solide en électronique, j’ai réalisé plusieurs projets mêlant matériel et logiciel. Je parle couramment l’anglais, une langue que j’apprécie particulièrement, et maîtrise les outils Microsoft Office (Word et PowerPoint parfaitement, Excel avec aisance). En dehors du travail, j’aime jouer au football et exprimer ma créativité à travers le dessin. <span class=\"emoji-bubble\">🌟</span>",
+      skills: [
+        { id: 1, title: "Programmation HTML, CSS, JavaScript", description: "Je conçois des interfaces web dynamiques et responsives en utilisant HTML pour la structure, CSS pour le design, et JavaScript pour l’interactivité, garantissant une expérience utilisateur fluide.", emoji: "💻" },
+        { id: 2, title: "Programmation Arduino", description: "J’utilise la plateforme Arduino pour développer des projets électroniques interactifs, en programmant des microcontrôleurs pour contrôler capteurs et actionneurs avec précision.", emoji: "🤖" },
+        { id: 3, title: "Base consistante en électronique", description: "Mes connaissances en circuits électroniques, composants et systèmes embarqués me permettent de concevoir et prototyper des solutions matérielles fiables.", emoji: "🔌" }
+      ],
+      projects: [
+        { id: 1, title: "Lampe rechargeable", description: "Conception d’une lampe rechargeable à base de circuits électroniques, intégrant une batterie et un système de gestion de l’énergie pour une utilisation durable et écoénergétique.", technologies: "Électronique, Arduino", link: "#", emoji: "💡" },
+        { id: 2, title: "Mini station météo basée sur Arduino", description: "Développement d’une station météo compacte utilisant Arduino pour mesurer la température, l’humidité et la pression atmosphérique, avec affichage en temps réel des données.", technologies: "Arduino, capteurs (DHT11, BMP180)", link: "#", emoji: "🌦️" },
+        { id: 3, title: "Plateforme web de résolution d’équations mathématiques", description: "Création d’une application web interactive permettant aux utilisateurs de résoudre des équations mathématiques complexes, avec une interface intuitive et des résultats instantanés.", technologies: "HTML, CSS, JavaScript", link: "#", emoji: "🧮" }
+      ]
+    };
+
+    // Charger ou initialiser les données
+    if (!localStorage.getItem('portfolio-about')) {
+      localStorage.setItem('portfolio-about', defaultData.about);
+      localStorage.setItem('portfolio-skills', JSON.stringify(defaultData.skills));
+      localStorage.setItem('portfolio-projects', JSON.stringify(defaultData.projects));
+    }
+
+    // Rendu dynamique
+    function renderPortfolio() {
+      const aboutText = document.getElementById('about-text');
+      const skillsGrid = document.getElementById('skills-grid');
+      const projectsGrid = document.getElementById('projects-grid');
+      const skills = JSON.parse(localStorage.getItem('portfolio-skills')) || [];
+      const projects = JSON.parse(localStorage.getItem('portfolio-projects')) || [];
+
+      aboutText.innerHTML = localStorage.getItem('portfolio-about');
+
+      skillsGrid.innerHTML = skills.map(skill => `
+        <div class="bg-white p-3 md:p-4 rounded-lg shadow-md text-center card">
+          <h3 class="text-base md:text-lg font-semibold mb-2"><span class="emoji-bubble">${skill.emoji}</span> ${skill.title}</h3>
+          <p class="text-gray-600 text-xs md:text-sm">${skill.description}</p>
+        </div>
+      `).join('');
+
+      projectsGrid.innerHTML = projects.map(project => `
+        <div class="bg-gray-100 p-3 md:p-4 rounded-lg shadow-md card" data-project='${JSON.stringify(project)}'>
+          <h3 class="text-base md:text-lg font-semibold mb-2"><span class="emoji-bubble">${project.emoji}</span> ${project.title}</h3>
+          <p class="text-gray-600 mb-3 text-xs md:text-sm">${project.description}</p>
+          <button class="text-blue-600 hover:underline open-modal text-xs md:text-sm">Voir le projet</button>
+        </div>
+      `).join('');
+    }
+
+    renderPortfolio();
+
+    // Gestion du modal
+    const modal = document.getElementById('project-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const modalDescription = document.getElementById('modal-description');
+    const modalTechnologies = document.getElementById('modal-technologies');
+    const modalLink = document.getElementById('modal-link');
+    const closeModal = document.querySelector('.close-modal');
+
+    document.addEventListener('click', (e) => {
+      if (e.target.classList.contains('open-modal')) {
+        const projectData = JSON.parse(e.target.parentElement.getAttribute('data-project'));
+        modalTitle.textContent = projectData.title;
+        modalDescription.textContent = projectData.description;
+        modalTechnologies.innerHTML = `<strong>Technologies :</strong> ${projectData.technologies}`;
+        modalLink.href = projectData.link;
+        modal.style.display = 'flex';
+        modal.classList.add('open');
+        gsap.fromTo('.modal-content', 
+          { opacity: 0, scale: 0.8, y: -30 }, 
+          { opacity: 1, scale: 1, y: 0, duration: 0.5, ease: 'power2.out' }
+        );
+      }
+    });
+
+    closeModal.addEventListener('click', () => {
+      gsap.to('.modal-content', {
+        opacity: 0,
+        scale: 0.8,
+        y: -30,
+        duration: 0.3,
+        ease: 'power2.in',
+        onComplete: () => {
+          modal.classList.remove('open');
+          modal.style.display = 'none';
+        }
+      });
+    });
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        gsap.to('.modal-content', {
+          opacity: 0,
+          scale: 0.8,
+          y: -30,
+          duration: 0.3,
+          ease: 'power2.in',
+          onComplete: () => {
+            modal.classList.remove('open');
+            modal.style.display = 'none';
+          }
+        });
+      }
+    });
+
+    // Animations GSAP
+    gsap.from("#about h2", {
+      opacity: 0,
+      x: -30,
+      duration: 0.8,
+      scrollTrigger: { trigger: "#about", start: "top 80%" }
+    });
+    gsap.from("#about p", {
+      opacity: 0,
+      y: 20,
+      duration: 0.8,
+      delay: 0.2,
+      scrollTrigger: { trigger: "#about", start: "top 80%" }
+    });
+
+    gsap.from("#skills h2", {
+      opacity: 0,
+      x: -30,
+      duration: 0.8,
+      scrollTrigger: { trigger: "#skills", start: "top 80%" }
+    });
+    gsap.from("#skills .card", {
+      opacity: 0,
+      y: window.innerWidth < 640 ? 20 : 50,
+      rotateY: window.innerWidth < 640 ? 0 : 45,
+      duration: 0.8,
+      stagger: 0.2,
+      ease: 'power2.out',
+      scrollTrigger: { trigger: "#skills", start: "top 80%" }
+    });
+
+    gsap.from("#projects h2", {
+      opacity: 0,
+      x: -30,
+      duration: 0.8,
+      scrollTrigger: { trigger: "#projects", start: "top 80%" }
+    });
+    gsap.from("#projects .card", {
+      opacity: 0,
+      y: window.innerWidth < 640 ? 20 : 50,
+      rotateY: window.innerWidth < 640 ? 0 : 45,
+      duration: 0.8,
+      stagger: 0.2,
+      ease: 'power2.out',
+      scrollTrigger: { trigger: "#projects", start: "top 80%" }
+    });
+
+    gsap.from("#contact h2", {
+      opacity: 0,
+      x: -30,
+      duration: 0.8,
+      scrollTrigger: { trigger: "#contact", start: "top 80%" }
+    });
+    gsap.from("#contact .card", {
+      opacity: 0,
+      scale: 0.9,
+      duration: 0.8,
+      scrollTrigger: { trigger: "#contact", start: "top 80%" }
+    });
+
+    // Animation de balancement pour les cartes
+    document.querySelectorAll('.card').forEach(card => {
+      if (window.innerWidth >= 640) {
+        gsap.to(card, {
+          rotation: 2,
+          repeat: -1,
+          yoyo: true,
+          duration: 1.5,
+          ease: 'sine.inOut',
+          transformOrigin: '50% -20px'
+        });
+        card.addEventListener('mouseenter', () => {
+          gsap.to(card, {
+            y: -12,
+            scale: 1.05,
+            rotation: 4,
+            duration: 0.5,
+            ease: 'power2.out',
+            overwrite: true
+          });
+        });
+        card.addEventListener('mouseleave', () => {
+          gsap.to(card, {
+            y: 0,
+            scale: 1,
+            rotation: 2,
+            repeat: -1,
+            yoyo: true,
+            duration: 1.5,
+            ease: 'sine.inOut',
+            transformOrigin: '50% -20px'
+          });
+        });
+      } else {
+        gsap.to(card, {
+          y: 0,
+          duration: 0.5,
+          ease: 'power2.out'
+        });
+      }
+    });
+  </script>
+</body>
+</html>
